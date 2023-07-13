@@ -6,18 +6,14 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"time"
 
 	"github.com/redhatinsights/insights-ingress-go/internal/announcers"
 	"github.com/redhatinsights/insights-ingress-go/internal/api"
 	"github.com/redhatinsights/insights-ingress-go/internal/config"
-	l "github.com/redhatinsights/insights-ingress-go/internal/logger"
+	"github.com/redhatinsights/insights-ingress-go/internal/logging"
 	"github.com/redhatinsights/insights-ingress-go/internal/queue"
 	"github.com/redhatinsights/insights-ingress-go/internal/stage/s3compat"
-	"github.com/redhatinsights/insights-ingress-go/internal/track"
-	"github.com/redhatinsights/insights-ingress-go/internal/upload"
 	"github.com/redhatinsights/insights-ingress-go/internal/validators/kafka"
-	"github.com/redhatinsights/insights-ingress-go/internal/version"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
@@ -41,9 +37,9 @@ func apiSpec(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	cfg := config.Get()
-	l.InitLogger(cfg)
+	l.Setup(cfg)
+
 	r := chi.NewRouter()
-	mr := chi.NewRouter()
 	r.Use(
 		request_id.ConfiguredRequestID("x-rh-insights-request-id"),
 		middleware.RealIP,
@@ -60,10 +56,9 @@ func main() {
 		KafkaSecurityProtocol: cfg.KafkaConfig.KafkaSecurityProtocol,
 	}
 
-	producerCfg := queue.ProducerConfig{
+	producerCfg := queue.Producer{
 		Brokers:               cfg.KafkaConfig.KafkaBrokers,
 		Topic:                 cfg.KafkaConfig.KafkaTrackerTopic,
-		Async:                 true,
 		KafkaDeliveryReports:  cfg.KafkaConfig.KafkaDeliveryReports,
 		KafkaSecurityProtocol: cfg.KafkaConfig.KafkaSecurityProtocol,
 		Debug:                 cfg.Debug,
@@ -89,14 +84,8 @@ func main() {
 		stager, validator, tracker, *cfg,
 	)
 
-	httpClient := &http.Client{
-		Timeout: time.Second * time.Duration(cfg.HTTPClientTimeout),
-	}
-
-	trackEndpoint := track.NewHandler(
-		*cfg,
-		httpClient,
-	)
+	trackLogger := logging.Log.WithFields(logrus.Fields{"source_host": cfg.Hostname, "name": "ingress"})
+	trackEndpoint := track.NewHandler(*cfg, trackLogger)
 
 	var sub chi.Router = chi.NewRouter()
 	if cfg.Auth {
@@ -113,6 +102,8 @@ func main() {
 	r.Mount("/api/ingress/v1", sub)
 	r.Mount("/r/insights/platform/ingress/v1", sub)
 	r.Get("/", lubDub)
+
+	mr := chi.NewRouter()
 	mr.Get("/", lubDub)
 	mr.Handle("/metrics", promhttp.Handler())
 
@@ -120,14 +111,14 @@ func main() {
 		r.Mount("/debug", middleware.Profiler())
 	}
 
-	l.Log.WithFields(logrus.Fields{"Web Port": cfg.WebPort}).Info("Starting Service")
+	logging.Log.WithFields(logrus.Fields{"Web Port": cfg.WebPort}).Info("Starting Service")
 
 	srv := http.Server{
 		Addr:    fmt.Sprintf(":%d", cfg.WebPort),
 		Handler: r,
 	}
 
-	l.Log.WithFields(logrus.Fields{"Metrics Port": cfg.MetricsPort}).Info("Starting Service")
+	logging.Log.WithFields(logrus.Fields{"Metrics Port": cfg.MetricsPort}).Info("Starting Service")
 
 	msrv := http.Server{
 		Addr:    fmt.Sprintf(":%d", cfg.MetricsPort),
@@ -140,10 +131,10 @@ func main() {
 		signal.Notify(sigint, os.Interrupt)
 		<-sigint
 		if err := srv.Shutdown(context.Background()); err != nil {
-			l.Log.WithFields(logrus.Fields{"error": err}).Fatal("HTTP Server Shutdown failed")
+			logging.Log.WithFields(logrus.Fields{"error": err}).Fatal("HTTP Server Shutdown failed")
 		}
 		if err := msrv.Shutdown(context.Background()); err != nil {
-			l.Log.WithFields(logrus.Fields{"error": err}).Fatal("HTTP Server Shutdown failed")
+			logging.Log.WithFields(logrus.Fields{"error": err}).Fatal("HTTP Server Shutdown failed")
 		}
 		close(idleConnsClosed)
 	}()
@@ -152,16 +143,15 @@ func main() {
 	version.ExposeVersion()
 
 	go func() {
-
 		if err := msrv.ListenAndServe(); err != http.ErrServerClosed {
-			l.Log.WithFields(logrus.Fields{"error": err}).Fatal("Metrics Service Stopped")
+			logging.Log.WithFields(logrus.Fields{"error": err}).Fatal("Metrics Service Stopped")
 		}
 	}()
 
 	if err := srv.ListenAndServe(); err != http.ErrServerClosed {
-		l.Log.WithFields(logrus.Fields{"error": err}).Fatal("Service Stopped")
+		logging.Log.WithFields(logrus.Fields{"error": err}).Fatal("Service Stopped")
 	}
 
 	<-idleConnsClosed
-	l.Log.Info("Everything has shut down, goodbye")
+	logging.Log.Info("Everything has shut down, goodbye")
 }

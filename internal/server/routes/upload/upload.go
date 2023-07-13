@@ -16,8 +16,8 @@ import (
 
 	"github.com/redhatinsights/insights-ingress-go/internal/announcers"
 	"github.com/redhatinsights/insights-ingress-go/internal/config"
-	l "github.com/redhatinsights/insights-ingress-go/internal/logger"
-	"github.com/redhatinsights/insights-ingress-go/internal/stage"
+	"github.com/redhatinsights/insights-ingress-go/internal/logging"
+	"github.com/redhatinsights/insights-ingress-go/internal/storage"
 	"github.com/redhatinsights/insights-ingress-go/internal/validators"
 	"github.com/redhatinsights/platform-go-middlewares/identity"
 	"github.com/redhatinsights/platform-go-middlewares/request_id"
@@ -139,7 +139,7 @@ func handleTestRequest(reqID string, identity identity.Identity, w http.Response
 
 // NewHandler returns a http handler configured with a Pipeline
 func NewHandler(
-	stager stage.Stager,
+	stager storage.Stager,
 	validator validators.Validator,
 	tracker announcers.Announcer,
 	cfg config.IngressConfig) http.HandlerFunc {
@@ -150,7 +150,7 @@ func NewHandler(
 		var id identity.XRHID
 		userAgent := r.Header.Get("User-Agent")
 		reqID := request_id.GetReqID(r.Context())
-		requestLogger := l.Log.WithFields(logrus.Fields{"request_id": reqID, "source_host": cfg.Hostname, "name": "ingress"})
+		requestLogger := logging.Log.WithFields(logrus.Fields{"request_id": reqID, "source_host": cfg.Hostname, "name": "ingress"})
 
 		logerr := func(msg string, err error) {
 			requestLogger.WithFields(logrus.Fields{"error": err}).Error(msg)
@@ -279,7 +279,7 @@ func NewHandler(
 		requestLogger.Info("Payload received")
 		tracker.Status(ps)
 
-		stageInput := &stage.Input{
+		stageInput := &storage.Input{
 			Payload: file,
 			Key:     reqID,
 			Account: vr.Account,

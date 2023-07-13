@@ -4,79 +4,36 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/redhatinsights/insights-ingress-go/internal/config"
-	l "github.com/redhatinsights/insights-ingress-go/internal/logger"
-	"github.com/redhatinsights/insights-ingress-go/internal/queue"
+	"github.com/redhatinsights/insights-ingress-go/internal/common"
 	"github.com/redhatinsights/insights-ingress-go/internal/validators"
 	"github.com/sirupsen/logrus"
 )
 
 // Validator posts requests to topics for validation
 type Validator struct {
-	ValidationProducerChannel chan validators.ValidationMessage
-	KafkaBrokers              []string
-	KafkaGroupID              string
-	Username                  string
-	Password                  string
-	CA                        string
-	SASLMechanism             string
-	KafkaSecurityProtocol     string
-	validUploadTypes          map[string]bool
-}
-
-// Config configures a new Kafka Validator
-type Config struct {
-	Brokers               []string
-	GroupID               string
-	ValidationTopic       string
-	Username              string
-	Password              string
-	CA                    string
-	KafkaSecurityProtocol string
-	SASLMechanism         string
-	Debug                 bool
+	CompletedConfig
 }
 
 // New constructs and initializes a new Kafka Validator
-func New(cfg *Config, validServices ...string) *Validator {
-	kv := &Validator{
-		ValidationProducerChannel: make(chan validators.ValidationMessage),
-		KafkaBrokers:              cfg.Brokers,
-		KafkaGroupID:              cfg.GroupID,
-		KafkaSecurityProtocol:     cfg.KafkaSecurityProtocol,
+func New(c CompletedConfig, co common.CompletedConfig) (*Validator, error) {
+	if producer, err := NewProducer(c, co); err != nil {
+		return nil, err
+	} else {
+		go producer.Produce(c.ValidationProducerChannel, c.AnnounceTopic)
+		return &Validator{
+			c,
+		}, nil
 	}
-
-	if cfg.CA != "" {
-		kv.CA = cfg.CA
-	}
-
-	if cfg.Username != "" {
-		kv.Username = cfg.Username
-		kv.Password = cfg.Password
-	}
-
-	if cfg.SASLMechanism != "" {
-		kv.SASLMechanism = cfg.SASLMechanism
-	}
-
-	kv.validUploadTypes = buildValidUploadTypeMap(validServices)
-
-	announceTopic := config.Get().KafkaConfig.KafkaAnnounceTopic
-
-	kv.addProducer(announceTopic)
-
-	return kv
 }
 
 // Validate validates a ValidationRequest
 func (kv *Validator) Validate(vr *validators.Request) {
 	data, err := json.Marshal(vr)
 	if err != nil {
-		l.Log.WithFields(logrus.Fields{"error": err}).Error("failed to marshal json")
+		kv.Log.WithFields(logrus.Fields{"error": err}).Error("failed to marshal json")
 		return
 	}
-	announceTopic := config.Get().KafkaConfig.KafkaAnnounceTopic
-	l.Log.WithFields(logrus.Fields{"data": data, "topic": announceTopic}).Debug("Posting data to topic")
+	kv.Log.WithFields(logrus.Fields{"data": data, "topic": kv.AnnounceTopic}).Debug("Posting data to topic")
 	message := validators.ValidationMessage{
 		Message: data,
 		Headers: map[string]string{
@@ -91,39 +48,10 @@ func (kv *Validator) Validate(vr *validators.Request) {
 	incMessageProduced(vr.Service)
 }
 
-func (kv *Validator) addProducer(topic string) {
-	ch := make(chan validators.ValidationMessage, 100)
-	go queue.Producer(ch, &queue.ProducerConfig{
-		Brokers:               kv.KafkaBrokers,
-		Topic:                 topic,
-		CA:                    kv.CA,
-		Username:              kv.Username,
-		Password:              kv.Password,
-		KafkaSecurityProtocol: kv.KafkaSecurityProtocol,
-		SASLMechanism:         kv.SASLMechanism,
-	})
-	kv.ValidationProducerChannel = ch
-}
-
 // ValidateService ensures that a service maps to a real topic
 func (kv *Validator) ValidateService(service *validators.ServiceDescriptor) error {
-
-	_, isValidUploadType := kv.validUploadTypes[service.Service]
-
-	if isValidUploadType {
+	if kv.ValidUploadTypes.Contains(service.Service) {
 		return nil
 	}
-
 	return errors.New("Upload type is not supported: " + service.Service)
-}
-
-func buildValidUploadTypeMap(validUploadTypeList []string) map[string]bool {
-
-	validUploadTypes := make(map[string]bool)
-
-	for _, service := range validUploadTypeList {
-		validUploadTypes[service] = true
-	}
-
-	return validUploadTypes
 }

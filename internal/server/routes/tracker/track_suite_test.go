@@ -1,18 +1,17 @@
-package version_test
+package tracker
 
 import (
 	"testing"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
 	"github.com/redhatinsights/insights-ingress-go/internal/config"
 	l "github.com/redhatinsights/insights-ingress-go/internal/logger"
 )
 
-func TestInventory(t *testing.T) {
+func TestTrack(t *testing.T) {
 	cfg := config.Get()
 	RegisterFailHandler(Fail)
 	l.InitLogger(cfg)
-	RunSpecs(t, "Version Suite")
+	RunSpecs(t, "Track Suite")
 }

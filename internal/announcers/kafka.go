@@ -35,11 +35,11 @@ type Status struct {
 }
 
 // NewStatusAnnouncer creates a new announcer and starts the producer
-func NewStatusAnnouncer(cfg *queue.ProducerConfig) *Kafka {
+func NewStatusAnnouncer(cfg *queue.Producer) *Kafka {
 	k := &Kafka{
 		In: make(chan validators.ValidationMessage, 1000),
 	}
-	go queue.Producer(k.In, cfg)
+	go queue.Produce(k.In, cfg)
 	return k
 }
 

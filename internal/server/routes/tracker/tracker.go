@@ -1,4 +1,4 @@
-package track
+package tracker
 
 import (
 	"encoding/json"
@@ -9,8 +9,6 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi"
-	"github.com/redhatinsights/insights-ingress-go/internal/config"
-	l "github.com/redhatinsights/insights-ingress-go/internal/logger"
 	"github.com/redhatinsights/platform-go-middlewares/identity"
 	"github.com/redhatinsights/platform-go-middlewares/request_id"
 
@@ -44,18 +42,19 @@ type MinimalStatus struct {
 }
 
 // NewHandlers returns an http handler for tracking
-func NewHandler(
-	cfg config.IngressConfig, client *http.Client) http.HandlerFunc {
+func NewHandler(c CompletedConfig) http.HandlerFunc {
+
+	logerr := func(msg string, err error) {
+		c.Log.WithFields(logrus.Fields{"error": err}).Error(msg)
+	}
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		var id identity.XRHID
 		reqID := chi.URLParam(r, "requestID")
-		requestLogger := l.Log.WithFields(logrus.Fields{"source_host": cfg.Hostname, "name": "ingress"})
 
-		logerr := func(msg string, err error) {
-			requestLogger.WithFields(logrus.Fields{"error": err}).Error(msg)
-		}
+		requestLogger := c.Log.WithFields(logrus.Fields{"source_host": c.Common.Hostname, "name": "ingress"})
 
-		if cfg.Auth {
+		if c.Common.Auth {
 			id = identity.Get(r.Context())
 		}
 
@@ -67,7 +66,7 @@ func NewHandler(
 
 		verbosity, _ := strconv.Atoi(r.URL.Query().Get("verbosity"))
 
-		response, err := client.Get(cfg.PayloadTrackerURL + reqID)
+		response, err := c.Client.Get(c.Url + reqID)
 		if err != nil {
 			logerr("Failed to get payload status", err)
 			w.WriteHeader(http.StatusInternalServerError)

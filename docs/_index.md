@@ -12,8 +12,7 @@ the Kafka Message Queue, and Amazon S3 for storing the files.
 Ingress sits behind the 3Scale gateway which provides authentication,
 routing, and assignment of a unique ID for each payloads.
 
-[Code
-Repository](https://www.github.com/RedHatInsights/insights-ingress-go)
+[Code Repository](https://www.github.com/RedHatInsights/insights-ingress-go)
 
 <div id="how-it-works" class="section">
 
@@ -99,7 +98,7 @@ customer should engage with support.
 
 <div id="prequisites" class="section">
 
-### Prequisites
+### Prerequisites
 
 Golang \>= 1.12
 
@@ -172,7 +171,7 @@ Or you can stand up the stack with the provided docker-compose
 ### Uploading a file locally
 
 Ingress expects to be behind a 3Scale gateway that provides some
-manadatory headers. You can provide these headers manually with a curl
+mandatory headers. You can provide these headers manually with a curl
 command
 
 <div class="highlight-default notranslate">

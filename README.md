@@ -5,13 +5,11 @@ Kafka message queue to other platform services.
 
 ## Details
 
-Ingress is a component of cloud.redhat.com that allows for clients to upload data
-to Red Hat. The service sites behind a 3Scale gateway that handles authentication,
-routing, and assignment of unique ID to the upload.
+Ingress is a component of cloud.redhat.com that allows for clients to upload data to Red Hat. The service sits
+behind a 3Scale gateway that handles authentication, routing, and assignment of unique ID to the upload.
 
-Ingress has an interface into cloud storage to retain customer data. It also connects
-to a Kafka message queue in order to notify services of new and available uploads
-for processing.
+Ingress has an interface into cloud storage to retain customer data. It also connects to a Kafka message queue
+in order to notify services of new and available uploads for processing.
 
 The service runs inside Openshift Dedicated.
 
@@ -23,11 +21,12 @@ The Ingress workflow is as follows:
 
   - The source client sends a payload of a specific content type to cloud.redhat.com
   - Ingress discovers a validating service from the content type, uploads the file to
-  cloud storage, and puts a message on the announcement topic while applying a header
-  to identify the destination service.
+    cloud storage, and puts a message on the announcement topic while applying a header
+    to identify the destination service.
 
-For the vast majority of upload types, the above process is accurate. For payloads from both
-**ansible tower** and the **insights cluster operator**, the flow is a bit different. The key difference here is that it relies on the UHC Auth Proxy for authentication.
+For the vast majority of upload types, the above process is accurate. For payloads from both **ansible tower**
+and the **insights cluster operator**, the flow is a bit different. The key difference here is that it relies
+on the UHC Auth Proxy for authentication.
 
 ![UML](https://www.plantuml.com/plantuml/png/TP5FSvim4CNl-HHRNzBEDEP0Jpt5mTF6qwRrXFYSMSC6D0Y9QbTntKzV2Mpe4FV4_dc_vV6uPK4dljLNxvGfj2y9Qf6EFoU9myEoKbBxlMToXJL2HfQ5RPDEeudC3KkfrJx9FjriusZty3rfaOLS63rdWK1bo2sxUFygFuPD-pwy92e-mY8RgaKeDuPLLGl3puuSYdMB3sSzDjYY2ffLNqHrjlunxLCkK5EOfdaiudwrtS1N53hWSTBvkWYhtNq6AoyrR9tzVOpYs94HLQ0eQo0dzweAcZXbAaVCqUHGHMZNQOlbMp6BTLZHdRDD_udvqCCmY6IUdfeBSDhlUrCj_h46xhGj6ZWVcO17qbEEOq23gTxV_TFJDX-4puzZX6DKNwmxe2jXZqmbM0Daoiug8pDs33U6Duzg9Xbp6g-BFG-11-lpyoF3wHHgXyVuZ3WBLa43Uryq9F-dvwcJAQ4Dgp2CPzx-XM_uqk3fp8pkhJpOL_hNoBLrrMQTd38FbQDVdbWswsjG1cn7Xclr8XUStWOpljL_0G00)
 
@@ -47,7 +46,7 @@ impact has been observed relating to this method of filtering.
 
 Uploads coming into Ingress should have the following content type:
 
-`application/vnd.redhat.<service-name>.filename+tgz`
+    application/vnd.redhat.<service-name>.filename+tg`
 
 The filename and file type may vary. The portion to note is the service name as
 this is where Ingress discovers the proper validating service and what header value
@@ -55,7 +54,7 @@ to apply to the `service` header.
 
 Example:
 
-  `application/vnd.redhat.advisor.example+tgz` => `{"service": "advisor"}`
+    application/vnd.redhat.advisor.example+tgz => {"service": "advisor"}
 
 ### Message Formats
 
@@ -148,8 +147,8 @@ More information on local development can be found [here](./development/README.m
 Ingress expects to be behind a 3Scale gateway that provides some mandatory headers.
 You can provide these headers manually with a curl command
 
-        $> curl -F "file=@somefile.tar.gz;type=application/vnd.redhat.<service-name>.somefile+tgz" -H "x-rh-identity: <base64 string>" -H "x-rh-insights-request-id: <uuid>" \
-        http://localhost:3000/api/ingress/v1/upload
+    $> curl -F "file=@somefile.tar.gz;type=application/vnd.redhat.<service-name>.somefile+tgz" -H "x-rh-identity: <base64 string>" -H "x-rh-insights-request-id: <uuid>" \
+    http://localhost:3000/api/ingress/v1/upload
 
 Note, that your service name needs to be in the `INGRESS_VALID_UPLOAD_TYPES` variable inside of the `.env` file.
 

@@ -1,4 +1,4 @@
-package track_test
+package tracker
 
 import (
 	"context"
@@ -11,8 +11,6 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/redhatinsights/insights-ingress-go/internal/config"
 	"github.com/redhatinsights/platform-go-middlewares/identity"
-
-	. "github.com/redhatinsights/insights-ingress-go/internal/track"
 )
 
 func makeTestRequest(uri string, request_id string, account string, orgID string, account_type string) (*http.Request, error) {
